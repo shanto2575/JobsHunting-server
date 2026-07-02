@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = process.env.MONGODB_URI;
 
 const app = express();
@@ -60,6 +60,75 @@ async function run() {
             res.json(result)
         })
 
+        app.patch('/api/employer/postedjob/:id', async (req, res) => {
+            try {
+                const { id } = req.params;
+                const data = req.body;
+
+                if (!id) {
+                    return res.status(400).json(
+                        {
+                            success: false,
+                            message: 'Id is Required!'
+                        }
+                    )
+                }
+                const { _id, ...updatedData } = data;
+
+                const result = await jobsCollection.updateOne(
+                    {
+                        _id: new ObjectId(id)
+                    },
+                    {
+                        $set: {
+                            ...updatedData,
+                            updatedAt: new Date()
+                        }
+                    }
+                )
+                res.status(200).json({
+                    success: true,
+                    message: 'Jobs Updated Successfull',
+                    result
+                })
+            } catch (error) {
+                console.log(error)
+                res.status(500).json({ message: 'Failed to Fetch Jobs' })
+            }
+        })
+
+        app.delete('/api/employer/postedjob/delete/:id',async(req,res)=>{
+            try{
+                const {id}=req.params;
+                if(!id){
+                    return res.status(400).json(
+                        {
+                            success:false,
+                            message:'Id is Required'
+                        }
+                    )
+                }
+                const result=await jobsCollection.deleteOne(
+                    {_id:new ObjectId(id)}
+                )
+                res.status(200).json(
+                    {
+                        success:true,
+                        message:'Delete Successfull',
+                        result
+                    }
+                )
+            }catch(error){
+                console.log(error)
+                res.status(500).json(
+                    { 
+                        success:false,
+                        message:'Failed To Delete Jobs'
+                    }
+                )
+            }
+            
+        })
 
 
 
