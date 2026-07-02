@@ -30,13 +30,33 @@ async function run() {
     try {
         await client.connect();
 
-        const db=client.db('JobsHunting')
-        const jobsCollection=db.collection('jobs')
+        const db = client.db('JobsHunting')
+        const jobsCollection = db.collection('jobs')
+
+        app.get('/api/employer/postedjobs/:email', async (req, res) => {
+            try {
+                const { email } = req.params;
+                if (!email) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Email Is required'
+                    })
+                }
+                const result = await jobsCollection.find({ userEmail: email }).sort({ createdAt: -1 }).toArray()
+                res.status(200).json({
+                    success: true,
+                    data: result
+                })
+            } catch (error) {
+                console.log(error)
+                res.status(500).json({ message: 'Failed to Fetch Jobs' })
+            }
+        })
 
 
-        app.post('/api/employer/postsjob',async(req,res)=>{
-            const data=req.body;
-            const result=await jobsCollection.insertOne(data)
+        app.post('/api/employer/postsjob', async (req, res) => {
+            const data = req.body;
+            const result = await jobsCollection.insertOne(data)
             res.json(result)
         })
 
