@@ -1,8 +1,19 @@
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = process.env.MONGODB_URI;
+
+cloudinary.config({
+    cloud_name: process.env.CLOUD_NAME,
+    api_key: process.env.API_KEY,
+    api_secret: process.env.API_SECRET,
+});
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 const app = express();
 
@@ -32,6 +43,27 @@ async function run() {
 
         const db = client.db('JobsHunting')
         const jobsCollection = db.collection('jobs')
+        const userCollection = db.collection('user')
+
+
+        //.............Home API...........
+        app.get('/api/alljobs', async (req, res) => {
+            try {
+                const result = await jobsCollection.find().sort({ createdAt: -1 }).toArray()
+                res.status(200).json(
+                    {
+                        success: true,
+                        message: ' Find Successful',
+                        result,
+                    }
+                )
+            } catch (error) {
+                console.log(error)
+                res.status(500).json({ message: 'Failed to Fetch Jobs' })
+            }
+        })
+
+        //...............Employer API................
 
         app.get('/api/employer/postedjobs/:email', async (req, res) => {
             try {
@@ -52,7 +84,6 @@ async function run() {
                 res.status(500).json({ message: 'Failed to Fetch Jobs' })
             }
         })
-
 
         app.post('/api/employer/postsjob', async (req, res) => {
             const data = req.body;
@@ -97,38 +128,109 @@ async function run() {
             }
         })
 
-        app.delete('/api/employer/postedjob/delete/:id',async(req,res)=>{
-            try{
-                const {id}=req.params;
-                if(!id){
+        app.delete('/api/employer/postedjob/delete/:id', async (req, res) => {
+            try {
+                const { id } = req.params;
+                if (!id) {
                     return res.status(400).json(
                         {
-                            success:false,
-                            message:'Id is Required'
+                            success: false,
+                            message: 'Id is Required'
                         }
                     )
                 }
-                const result=await jobsCollection.deleteOne(
-                    {_id:new ObjectId(id)}
+                const result = await jobsCollection.deleteOne(
+                    { _id: new ObjectId(id) }
                 )
                 res.status(200).json(
                     {
-                        success:true,
-                        message:'Delete Successfull',
+                        success: true,
+                        message: 'Delete Successfull',
                         result
                     }
                 )
-            }catch(error){
+            } catch (error) {
                 console.log(error)
                 res.status(500).json(
-                    { 
-                        success:false,
-                        message:'Failed To Delete Jobs'
+                    {
+                        success: false,
+                        message: 'Failed To Delete Jobs'
                     }
                 )
             }
-            
+
         })
+
+
+        //..............Cv Upload...............
+
+        app.post("/api/upload-cv", upload.single("cv"), async (req, res) => {
+            try {
+                const file = req.file;
+
+                if (!file) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "No file uploaded",
+                    });
+                }
+
+                const result = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_stream(
+                        {
+                            resource_type: "raw", // pdf file upload
+                            folder: "job-cv",
+                        },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    ).end(file.buffer);
+                });
+
+                res.status(200).json({
+                    success: true,
+                    message: "CV uploaded successfully",
+                    cvUrl: result.secure_url,
+                });
+
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({
+                    success: false,
+                    message: "Upload failed",
+                });
+            }
+        });
+
+        app.patch("/api/jobs/apply/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+                const applicantData = req.body;
+
+                const result = await jobsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    {
+                        $push: {
+                            applicants: applicantData
+                        }
+                    }
+                );
+
+                res.status(200).json({
+                    success: true,
+                    message: "Applied successfully",
+                    result
+                });
+
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({
+                    success: false,
+                    message: "Failed to apply"
+                });
+            }
+        });
 
 
 
