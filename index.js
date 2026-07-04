@@ -44,6 +44,7 @@ async function run() {
         const db = client.db('JobsHunting')
         const jobsCollection = db.collection('jobs')
         const userCollection = db.collection('user')
+        const bookmarkCollection = db.collection('bookmark')
 
 
         //.............Home API...........
@@ -160,6 +161,93 @@ async function run() {
             }
 
         })
+
+        //...............seeker.....................
+        app.get('/api/seeker/applied-jobs/:email', async (req, res) => {
+            try {
+                const { email } = req.params;
+                const result = await jobsCollection.find({ "applicants.email": email }).sort({ createdAt: -1 }).toArray();
+
+                res.status(200).json({
+                    success: true,
+                    message: "Applied jobs fetched successfully",
+                    result,
+                });
+
+            } catch (error) {
+                console.log(error)
+                res.status(500).json(
+                    {
+                        success: false,
+                        message: 'Failed to fetch applied jobs'
+                    }
+                )
+            }
+
+        })
+
+        app.get("/api/bookmark/:userId", async (req, res) => {
+            try {
+                const { userId } = req.params;
+
+                const result = await bookmarkCollection
+                    .find({ userId }).sort({updatedAt:-1})
+                    .toArray();
+
+                res.json({
+                    success: true,
+                    result,
+                });
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
+        app.post('/api/bookmark', async (req, res) => {
+            try {
+                const data = req.body;
+
+                const isExist = await bookmarkCollection.findOne(
+                    {
+                        userId: data.userId,
+                        jobId: data.jobId
+                    }
+                )
+
+                if (isExist) {
+                    await bookmarkCollection.deleteOne({
+                        _id: isExist._id,
+                    });
+
+                    return res.json({
+                        success: true,
+                        bookmarked: false,
+                        message: "Bookmark removed successfully",
+                    });
+                }
+
+                const result = await bookmarkCollection.insertOne(data)
+                res.status(200).json(
+                    {
+                        success: true,
+                        message: 'Bookmark added successfully',
+                        result
+                    }
+                )
+
+            } catch (error) {
+                console.log(error)
+                res.status(500).json({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        })
+
+
 
 
         //..............Cv Upload...............
