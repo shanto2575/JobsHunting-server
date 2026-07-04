@@ -246,7 +246,116 @@ async function run() {
             }
         });
 
-        
+        app.get("/api/employer/analytics/:email", async (req, res) => {
+            try {
+                const { email } = req.params;
+
+                const jobs = await jobsCollection
+                    .find({ userEmail: email })
+                    .toArray();
+
+                const totalJobs = jobs.length;
+
+                const activeJobs = jobs.filter(
+                    job => job.status === "active"
+                ).length;
+
+                const closedJobs = jobs.filter(
+                    job => job.status === "closed"
+                ).length;
+
+                let totalApplicants = 0;
+
+                let pending = 0;
+                let shortlisted = 0;
+                let interview = 0;
+                let hired = 0;
+                let rejected = 0;
+
+                const applicationsPerJob = [];
+
+                jobs.forEach(job => {
+
+                    const applicants = job.applicants || [];
+
+                    totalApplicants += applicants.length;
+
+                    applicationsPerJob.push({
+                        title: job.title,
+                        applicants: applicants.length,
+                    });
+
+                    applicants.forEach(applicant => {
+
+                        switch (applicant.status) {
+
+                            case "Pending":
+                                pending++;
+                                break;
+
+                            case "Shortlisted":
+                                shortlisted++;
+                                break;
+
+                            case "Interview":
+                                interview++;
+                                break;
+
+                            case "Hired":
+                                hired++;
+                                break;
+
+                            case "Rejected":
+                                rejected++;
+                                break;
+
+                        }
+
+                    });
+
+                });
+
+                res.send({
+
+                    success: true,
+
+                    totalJobs,
+
+                    activeJobs,
+
+                    closedJobs,
+
+                    totalApplicants,
+
+                    pending,
+
+                    shortlisted,
+
+                    interview,
+
+                    hired,
+
+                    rejected,
+
+                    applicationsPerJob,
+
+                });
+
+            } catch (err) {
+
+                console.log(err);
+
+                res.status(500).send({
+
+                    success: false,
+
+                    message: "Server Error",
+
+                });
+
+            }
+        });
+
         //...............seeker.....................
         app.get('/api/seeker/applied-jobs/:email', async (req, res) => {
             try {
