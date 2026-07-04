@@ -45,6 +45,7 @@ async function run() {
         const jobsCollection = db.collection('jobs')
         const userCollection = db.collection('user')
         const bookmarkCollection = db.collection('bookmark')
+        const reportCollection = db.collection('report')
 
 
         //.............Home API...........
@@ -85,6 +86,47 @@ async function run() {
                 res.status(500).json({ message: 'Failed to Fetch Jobs' })
             }
         })
+
+        app.get("/api/employer/applicants/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+
+                const job = await jobsCollection.findOne(
+                    {
+                        _id: new ObjectId(id),
+                    },
+                    {
+                        projection: {
+                            title: 1,
+                            company: 1,
+                            applicants: 1,
+                        },
+                    }
+                );
+
+                if (!job) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "Job not found",
+                    });
+                }
+
+                res.send({
+                    success: true,
+                    jobId: job._id,
+                    title: job.title,
+                    company: job.company,
+                    applicants: job.applicants || [],
+                });
+            } catch (err) {
+                console.log(err);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
 
         app.post('/api/employer/postsjob', async (req, res) => {
             const data = req.body;
@@ -162,6 +204,49 @@ async function run() {
 
         })
 
+        app.patch("/api/employer/applicants/status", async (req, res) => {
+            try {
+
+                const { jobId, userId, status } = req.body;
+
+                if (!jobId || !userId || !status) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Missing data",
+                    });
+                }
+
+                const result = await jobsCollection.updateOne(
+                    {
+                        _id: new ObjectId(jobId),
+                        "applicants.userId": userId,
+                    },
+                    {
+                        $set: {
+                            "applicants.$.status": status,
+                        },
+                    }
+                );
+
+                res.send({
+                    success: true,
+                    message: "Applicant status updated",
+                    result,
+                });
+
+            } catch (error) {
+
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+
+            }
+        });
+
+        
         //...............seeker.....................
         app.get('/api/seeker/applied-jobs/:email', async (req, res) => {
             try {
@@ -186,12 +271,14 @@ async function run() {
 
         })
 
+        //...........bookmark................
+
         app.get("/api/bookmark/:userId", async (req, res) => {
             try {
                 const { userId } = req.params;
 
                 const result = await bookmarkCollection
-                    .find({ userId }).sort({updatedAt:-1})
+                    .find({ userId }).sort({ updatedAt: -1 })
                     .toArray();
 
                 res.json({
@@ -247,6 +334,61 @@ async function run() {
             }
         })
 
+        //...............report..............
+
+        app.get("/api/report-jobs/:userId", async (req, res) => {
+            try {
+                const { userId } = req.params;
+
+                const result = await reportCollection.find({ userId }).toArray();
+
+                res.status(200).json({
+                    success: true,
+                    result,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).json({
+                    success: false,
+                    message: "Something went wrong",
+                });
+            }
+        });
+
+        app.post('/api/report-jobs', async (req, res) => {
+            try {
+                const data = req.body;
+                const isExist = await reportCollection.findOne({ jobId: data.jobId, userId: data.userId })
+                if (isExist) {
+                    return res.status(400).json(
+                        {
+                            success: false,
+                            message: 'Already Reported'
+                        }
+                    )
+                }
+                const result = await reportCollection.insertOne({
+                    ...data,
+                })
+                res.status(200).json(
+                    {
+                        success: true,
+                        message: "Report Added Successfully",
+                        result
+                    }
+                )
+            } catch (error) {
+                console.log(error)
+                res.status(500).json(
+                    {
+                        success: false,
+                        message: 'someThing went Wrong'
+                    }
+                )
+            }
+        })
+
 
 
 
@@ -263,11 +405,16 @@ async function run() {
                     });
                 }
 
+                // console.log(file); 
+
                 const result = await new Promise((resolve, reject) => {
                     cloudinary.uploader.upload_stream(
                         {
-                            resource_type: "raw", // pdf file upload
+                            resource_type: "raw",
                             folder: "job-cv",
+                            public_id: `cv-${Date.now()}`,
+                            use_filename: true,
+                            unique_filename: false,
                         },
                         (error, result) => {
                             if (error) reject(error);
@@ -275,11 +422,15 @@ async function run() {
                         }
                     ).end(file.buffer);
                 });
+                console.log(result)
+
+                const pdfUrl = result.secure_url;
+                // const pdfUrl = `${result.secure_url}.pdf`;
 
                 res.status(200).json({
                     success: true,
-                    message: "CV uploaded successfully",
-                    cvUrl: result.secure_url,
+                    cvUrl: pdfUrl,
+                    cvPublicId: result.public_id,
                 });
 
             } catch (error) {
