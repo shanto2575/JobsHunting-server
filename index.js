@@ -65,6 +65,76 @@ async function run() {
             }
         })
 
+        //............admin................
+        app.get('/api/manage-user', async (req, res) => {
+            try {
+                const result = await userCollection.find().sort({ createdAt: -1 }).toArray()
+                res.status(200).json(
+                    {
+                        success: true,
+                        message: 'User data fetched successfully',
+                        result
+                    }
+                )
+
+            } catch (error) {
+                console.log(error)
+                res.status(500).json(
+                    {
+                        success: false,
+                        message: 'sothing went wrongs'
+                    }
+                )
+            }
+        })
+
+        app.patch("/api/manage-user/block/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+                const { status } = req.body;
+
+                const result = await userCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    {
+                        $set: {
+                            status,
+                        },
+                    }
+                );
+
+                res.send({
+                    success: true,
+                    message: `User ${status} successfully`,
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
+        app.get("/api/user-status/:email", async (req, res) => {
+            const user = await userCollection.findOne({
+                email: req.params.email,
+            });
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found",
+                });
+            }
+
+            res.json({
+                success: true,
+                status: user.status,
+            });
+        });
+
         //...............Employer API................
 
         app.get('/api/employer/postedjobs/:email', async (req, res) => {
