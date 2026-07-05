@@ -93,20 +93,52 @@ async function run() {
                 const { id } = req.params;
                 const { status } = req.body;
 
-                const result = await userCollection.updateOne(
-                    { _id: new ObjectId(id) },
-                    {
-                        $set: {
-                            status,
-                        },
-                    }
-                );
+                const user = await userCollection.findOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "User not found",
+                    });
+                }
+
+                if (user.role === "admin") {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Admin account cannot be modified.",
+                    });
+                }
+
+                if (status === "blocked") {
+                    await userCollection.updateOne(
+                        { _id: new ObjectId(id) },
+                        {
+                            $set: {
+                                status: "blocked",
+                                blockedAt: new Date(),
+                            },
+                        }
+                    );
+                } else {
+                    await userCollection.updateOne(
+                        { _id: new ObjectId(id) },
+                        {
+                            $set: {
+                                status: "active",
+                            },
+                            $unset: {
+                                blockedAt: "",
+                            },
+                        }
+                    );
+                }
 
                 res.send({
                     success: true,
                     message: `User ${status} successfully`,
                 });
-
             } catch (error) {
                 console.log(error);
 
@@ -134,6 +166,41 @@ async function run() {
                 status: user.status,
             });
         });
+
+        app.delete('/api/user-account/delete/:id', async (req, res) => {
+            try {
+                const { id } = req.params;
+                const result = await userCollection.deleteOne({ _id: new ObjectId(id) })
+
+                if (result.role === "admin") {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Admin account cannot be modified.",
+                    });
+                }
+                res.status(200).json(
+                    {
+                        success: true,
+                        message: 'Account Deleted Successful',
+                        result
+                    }
+                )
+
+            } catch (error) {
+                console.log(error)
+                res.status(500).json(
+                    {
+                        success: false,
+                        message: 'sothing went wrongs'
+                    }
+                )
+            }
+        })
+
+        app.get('/api/black-user', async (req, res) => {
+            const result = await userCollection.find({ status: 'blocked' }).sort({ createdAt: -1 }).toArray()
+            res.json(result)
+        })
 
         //...............Employer API................
 
