@@ -636,8 +636,6 @@ async function run() {
         })
 
 
-
-
         //..............Cv Upload...............
 
         app.post("/api/upload-cv", upload.single("cv"), async (req, res) => {
@@ -658,7 +656,7 @@ async function run() {
                         {
                             resource_type: "raw",
                             folder: "job-cv",
-                            public_id: `cv-${Date.now()}`,
+                            public_id: `cv-${Date.now()}.pdf`,
                             use_filename: true,
                             unique_filename: false,
                         },
@@ -668,7 +666,7 @@ async function run() {
                         }
                     ).end(file.buffer);
                 });
-                console.log(result)
+                // console.log(result)
 
                 const pdfUrl = result.secure_url;
                 // const pdfUrl = `${result.secure_url}.pdf`;
@@ -716,9 +714,6 @@ async function run() {
                 });
             }
         });
-
-
-
 
 
 
