@@ -264,6 +264,84 @@ async function run() {
             }
         });
 
+        app.get("/api/admin/analytics", async (req, res) => {
+            try {
+
+                const totalUsers = await userCollection.countDocuments();
+
+                const totalJobs = await jobsCollection.countDocuments();
+
+                const employers = await userCollection.countDocuments({
+                    role: "employer",
+                });
+
+                const seekers = await userCollection.countDocuments({
+                    role: "seeker",
+                });
+
+                const blockedUsers = await userCollection.countDocuments({
+                    status: "blocked",
+                });
+
+                const approvedJobs = await jobsCollection.countDocuments({
+                    status: "approved",
+                });
+
+                const pendingJobs = await jobsCollection.countDocuments({
+                    status: "pending",
+                });
+
+                const rejectedJobs = await jobsCollection.countDocuments({
+                    status: "rejected",
+                });
+
+                const applications = await jobsCollection.aggregate([
+                    {
+                        $project: {
+                            total: {
+                                $size: {
+                                    $ifNull: ["$applicants", []],
+                                },
+                            },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            totalApplications: {
+                                $sum: "$total",
+                            },
+                        },
+                    },
+                ]).toArray();
+
+                res.send({
+                    success: true,
+
+                    analytics: {
+                        totalUsers,
+                        totalJobs,
+                        employers,
+                        seekers,
+                        blockedUsers,
+                        approvedJobs,
+                        pendingJobs,
+                        rejectedJobs,
+                        totalApplications:
+                            applications[0]?.totalApplications || 0,
+                    },
+                });
+
+            } catch (error) {
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+
+            }
+        });
+
         //...............Employer API................
 
         app.get('/api/employer/postedjobs/:email', async (req, res) => {
