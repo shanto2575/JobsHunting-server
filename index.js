@@ -49,21 +49,118 @@ async function run() {
 
 
         //.............Home API...........
-        app.get('/api/alljobs', async (req, res) => {
+        app.get("/api/alljobs", async (req, res) => {
             try {
-                const result = await jobsCollection.find().sort({ createdAt: -1 }).toArray()
-                res.status(200).json(
-                    {
-                        success: true,
-                        message: ' Find Successful',
-                        result,
+                const {
+                    search,
+                    category,
+                    type,
+                    location,
+                    salary,
+                    page = 1,
+                    limit = 6,
+                } = req.query;
+
+                const query = {
+                    status: "approved",
+                };
+
+                if (search) {
+                    query.$or = [
+                        {
+                            title: {
+                                $regex: search,
+                                $options: "i",
+                            },
+                        },
+                        {
+                            company: {
+                                $regex: search,
+                                $options: "i",
+                            },
+                        },
+                    ];
+                }
+
+                if (category) {
+                    query.category = category;
+                }
+
+                if (type) {
+                    query.type = type;
+                }
+
+                if (location) {
+                    query.location = {
+                        $regex: location,
+                        $options: "i",
+                    };
+                }
+                if (salary) {
+
+                    const [min, max] = salary.split("-");
+
+                    if (max) {
+
+                        query.$expr = {
+                            $and: [
+                                {
+                                    $gte: [
+                                        { $toInt: "$salary" },
+                                        Number(min),
+                                    ],
+                                },
+                                {
+                                    $lte: [
+                                        { $toInt: "$salary" },
+                                        Number(max),
+                                    ],
+                                },
+                            ],
+                        };
+
+                    } else {
+
+                        query.$expr = {
+                            $gte: [
+                                { $toInt: "$salary" },
+                                Number(min),
+                            ],
+                        };
+
                     }
-                )
+
+                }
+
+                const currentPage = Number(page);
+                const perPage = Number(limit);
+
+                const totalJobs = await jobsCollection.countDocuments(query);
+
+                const result = await jobsCollection
+                    .find(query)
+                    .sort({ createdAt: -1 })
+                    .skip((currentPage - 1) * perPage)
+                    .limit(perPage)
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    result,
+                    pagination: {
+                        currentPage,
+                        perPage,
+                        totalJobs,
+                        totalPages: Math.ceil(totalJobs / perPage),
+                    },
+                });
             } catch (error) {
-                console.log(error)
-                res.status(500).json({ message: 'Failed to Fetch Jobs' })
+                res.status(500).send({
+                    success: false,
+                    message: "Failed to fetch jobs",
+                });
             }
-        })
+        });
 
         //............admin................
         app.get('/api/manage-user', async (req, res) => {
@@ -854,8 +951,6 @@ async function run() {
                 });
             }
         });
-
-
 
 
         await client.db("admin").command({ ping: 1 });
