@@ -202,6 +202,68 @@ async function run() {
             res.json(result)
         })
 
+        app.get('/api/manage-jobs', async (req, res) => {
+            const result = await jobsCollection.find().sort({ createdAt: -1 }).toArray()
+            res.json(result)
+        })
+
+        app.delete("/api/admin/jobs/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+
+                const result = await jobsCollection.deleteOne(
+                    { _id: new ObjectId(id) },
+                );
+                res.status(200).json({
+                    success: true,
+                    message: `Job Delete successfully`,
+                    result
+                });
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
+        app.patch("/api/admin/jobs/status/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+                const { status } = req.body;
+
+                const result = await jobsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    {
+                        $set: {
+                            status,
+                            updatedAt: new Date(),
+                        },
+                    }
+                );
+
+                if (result.modifiedCount === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Job not found",
+                    });
+                }
+
+                res.status(200).json({
+                    success: true,
+                    message: `Job ${status} successfully`,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).json({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
         //...............Employer API................
 
         app.get('/api/employer/postedjobs/:email', async (req, res) => {
