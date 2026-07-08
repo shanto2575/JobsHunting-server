@@ -163,6 +163,35 @@ async function run() {
             }
         });
 
+        app.get("/api/jobs/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+
+                const job = await jobsCollection.findOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (!job) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Job not found",
+                    });
+                }
+                const totalApplicants = job.applicants?.length || 0;
+
+                res.json({
+                    success: true,
+                    result: job,
+                    totalApplicants
+                });
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
         //............admin................
         app.get('/api/manage-user', async (req, res) => {
             try {
@@ -505,6 +534,20 @@ async function run() {
 
         app.post('/api/employer/postsjob', async (req, res) => {
             const data = req.body;
+            const user = await userCollection.findOne({
+                email: data.userEmail,
+            });
+            const totalJobs = await jobsCollection.countDocuments(
+                {
+                    userEmail: data.userEmail
+                }
+            )
+            if (user.plan !== 'pro' && totalJobs >= 3) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Free users can post only 3 jobs. Upgrade to Pro for unlimited job posting.",
+                });
+            }
             const result = await jobsCollection.insertOne(data)
             res.json(result)
         })
@@ -926,52 +969,102 @@ async function run() {
 
         app.patch("/api/jobs/apply/:id", async (req, res) => {
             try {
+
                 const { id } = req.params;
                 const applicantData = req.body;
 
+                const user = await userCollection.findOne({
+                    email: applicantData.email,
+                });
+
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "User not found",
+                    });
+                }
+
+                // Free Plan Limit
+                if (user.plan !== "pro") {
+
+                    const totalApplications = await jobsCollection.countDocuments({
+                        "applicants.email": applicantData.email,
+                    });
+
+                    if (totalApplications >= 5) {
+                        return res.status(403).json({
+                            success: false,
+                            message:
+                                "Free users can apply only 5 jobs. Please upgrade to Pro.",
+                        });
+                    }
+                }
+
+                // Already Applied Check
+                const alreadyApplied = await jobsCollection.findOne({
+                    _id: new ObjectId(id),
+                    "applicants.email": applicantData.email,
+                });
+
+                if (alreadyApplied) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "You have already applied for this job.",
+                    });
+                }
+
                 const result = await jobsCollection.updateOne(
-                    { _id: new ObjectId(id) },
+                    {
+                        _id: new ObjectId(id),
+                    },
                     {
                         $push: {
-                            applicants: applicantData
-                        }
+                            applicants: applicantData,
+                        },
                     }
                 );
 
                 res.status(200).json({
                     success: true,
-                    message: "Applied successfully",
-                    result
+                    message: "Applied Successfully",
+                    result,
                 });
 
             } catch (error) {
+
                 console.log(error);
+
                 res.status(500).json({
                     success: false,
-                    message: "Failed to apply"
+                    message: "Failed to apply",
                 });
+
             }
         });
 
+        //.........subscription..............
+
         app.post('/api/subscription', async (req, res) => {
-            const { userId, userEmail, sessionId, priceId }=req.body;
-            const isExist=await subscriptionCollection.findOne({sessionId})
-            if(isExist){
-                return res.json({message:'Already Exist'})
+            const { userId, userEmail, sessionId, priceId } = req.body;
+            const isExist = await subscriptionCollection.findOne({ sessionId })
+            if (isExist) {
+                return res.json({ message: 'Already Exist' })
             }
             await subscriptionCollection.insertOne({
                 sessionId,
                 userId,
                 userEmail,
-                priceId
+                priceId,
+                amout: 5,
+                date: new Date()
             })
             await userCollection.updateOne(
-                {_id:new ObjectId(userId)},
+                { _id: new ObjectId(userId) },
                 {
-                    $set:{plan:'pro'}
+                    $set: { plan: 'pro' }
                 }
             )
-            res.json({message:'payments Successful'})
+            res.json({ message: 'payments Successful' })
         })
 
 
