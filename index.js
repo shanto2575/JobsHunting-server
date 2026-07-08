@@ -46,6 +46,7 @@ async function run() {
         const userCollection = db.collection('user')
         const bookmarkCollection = db.collection('bookmark')
         const reportCollection = db.collection('report')
+        const subscriptionCollection = db.collection('subscription')
 
 
         //.............Home API...........
@@ -951,6 +952,27 @@ async function run() {
                 });
             }
         });
+
+        app.post('/api/subscription', async (req, res) => {
+            const { userId, userEmail, sessionId, priceId }=req.body;
+            const isExist=await subscriptionCollection.findOne({sessionId})
+            if(isExist){
+                return res.json({message:'Already Exist'})
+            }
+            await subscriptionCollection.insertOne({
+                sessionId,
+                userId,
+                userEmail,
+                priceId
+            })
+            await userCollection.updateOne(
+                {_id:new ObjectId(userId)},
+                {
+                    $set:{plan:'pro'}
+                }
+            )
+            res.json({message:'payments Successful'})
+        })
 
 
         await client.db("admin").command({ ping: 1 });
