@@ -194,6 +194,57 @@ async function run() {
         });
 
         //............admin................
+
+        app.get("/api/admin/profile", async (req, res) => {
+            try {
+
+                // Total Users
+                const totalUsers = await userCollection.countDocuments();
+
+                // Pro Users
+                const proUsers = await userCollection.countDocuments({
+                    plan: "pro",
+                });
+
+                // Pending Job Approvals
+                const pendingApprovals = await jobsCollection.countDocuments({
+                    status: "pending",
+                });
+
+                // Total Revenue
+                const revenue = await subscriptionCollection.aggregate([
+                    {
+                        $group: {
+                            _id: null,
+                            totalRevenue: {
+                                $sum: "$amout",
+                            },
+                        },
+                    },
+                ]).toArray();
+
+                const totalRevenue = revenue[0]?.totalRevenue || 0;
+
+                res.send({
+                    success: true,
+                    result: {
+                        totalUsers,
+                        proUsers,
+                        pendingApprovals,
+                        totalRevenue,
+                    },
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
         app.get('/api/manage-user', async (req, res) => {
             try {
                 const result = await userCollection.find().sort({ createdAt: -1 }).toArray()
@@ -476,20 +527,45 @@ async function run() {
             try {
                 const { email } = req.params;
 
-                const jobs = await jobsCollection.find({
+                // Total Published Jobs
+                const totalPublish = await jobsCollection.countDocuments({
                     userEmail: email,
-                }).toArray();
+                });
 
-                const totalPublish = jobs.length;
+                // Total Applicants
+                const applicantResult = await jobsCollection.aggregate([
+                    {
+                        $match: {
+                            userEmail: email,
+                        },
+                    },
+                    {
+                        $project: {
+                            applicantCount: {
+                                $size: {
+                                    $ifNull: ["$applicants", []],
+                                },
+                            },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            totalApplicants: {
+                                $sum: "$applicantCount",
+                            },
+                        },
+                    },
+                ]).toArray();
 
-                const totalApplicants = jobs.reduce((total, job) => {
-                    return total + (job.applicants?.length || 0);
-                }, 0);
+                const totalApplicants = applicantResult[0]?.totalApplicants || 0;
 
                 res.send({
                     success: true,
-                    totalPublish,
-                    totalApplicants,
+                    result: {
+                        totalPublish,
+                        totalApplicants,
+                    },
                 });
 
             } catch (error) {
@@ -881,6 +957,101 @@ async function run() {
         });
 
         //...............seeker.....................
+
+        app.get("/api/seeker/profile/:email", async (req, res) => {
+            try {
+                const { email } = req.params;
+                // console.log(email)
+
+                const user = await userCollection.findOne({
+                    email,
+                });
+
+                if (!user) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found",
+                    });
+                }
+
+                // Applied Jobs
+                const appliedJobs = await jobsCollection.countDocuments({
+                    "applicants.email": email,
+                });
+                // console.log(appliedJobs)
+
+                // Interview Count
+                const interview = await jobsCollection.aggregate([
+                    {
+                        $unwind: "$applicants",
+                    },
+                    {
+                        $match: {
+                            "applicants.email": email,
+                            "applicants.status": "Interview",
+                        },
+                    },
+                    {
+                        $count: "total",
+                    },
+                ]).toArray();
+                // console.log(interview)
+
+                const interviews = interview[0]?.total || 0;
+
+                // Saved Jobs
+                const savedJobs = await bookmarkCollection.countDocuments({
+                    userId: user._id.toString(),
+                });
+                // console.log(savedJobs)
+
+                // Applicant CV
+                const applicant = await jobsCollection.aggregate([
+                    {
+                        $unwind: "$applicants",
+                    },
+                    {
+                        $match: {
+                            "applicants.email": email,
+                        },
+                    },
+                    {
+                        $sort: {
+                            "applicants.appliedAt": -1,
+                        },
+                    },
+                    {
+                        $limit: 1,
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            resume: "$applicants.cv",
+                            cvPublicId: "$applicants.cvPublicId",
+                            appliedAt: "$applicants.appliedAt",
+                        },
+                    },
+                ]).toArray();
+
+                const resume = applicant[0]?.resume || null;
+                res.send({
+                    success: true,
+                    appliedJobs,
+                    savedJobs,
+                    interviews,
+                    resume,
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
         app.get('/api/seeker/applied-jobs/:email', async (req, res) => {
             try {
                 const { email } = req.params;
