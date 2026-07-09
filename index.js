@@ -47,6 +47,7 @@ async function run() {
         const bookmarkCollection = db.collection('bookmark')
         const reportCollection = db.collection('report')
         const subscriptionCollection = db.collection('subscription')
+        const notificationCollection = db.collection('notification')
 
 
         //.............Home API...........
@@ -624,8 +625,7 @@ async function run() {
 
         app.patch("/api/employer/applicants/status", async (req, res) => {
             try {
-
-                const { jobId, userId, status } = req.body;
+                const { jobId, userId, status, interview, hiring, } = req.body;
 
                 if (!jobId || !userId || !status) {
                     return res.status(400).send({
@@ -634,35 +634,111 @@ async function run() {
                     });
                 }
 
+                // Applicant Status Update
+                const updateData = {
+                    "applicants.$.status": status,
+                };
+
+                // Interview Details Save
+                if (status === "Interview" && interview) {
+                    updateData["applicants.$.interview"] = interview;
+                }
+
+                // Hiring Details Save
+                if (status === "Hired" && hiring) {
+                    updateData["applicants.$.hiring"] = hiring;
+                }
+
                 const result = await jobsCollection.updateOne(
                     {
                         _id: new ObjectId(jobId),
                         "applicants.userId": userId,
                     },
                     {
+                        $set: updateData,
+                    }
+                );
+
+                // Job Find
+                const job = await jobsCollection.findOne({
+                    _id: new ObjectId(jobId),
+                });
+
+                const applicant = job.applicants.find(
+                    (item) => item.userId === userId
+                );
+
+                let message = "";
+
+                switch (status) {
+                    case "Shortlisted":
+                        message = `🎉 Congratulations! You have been shortlisted for the ${job.title} position at ${job.company}.`;
+                        break;
+
+                    case "Interview":
+                        message = `📅 ${job.company} invited you for an interview for the ${job.title} position.`;
+                        break;
+
+                    case "Hired":
+                        message = `🎉 Congratulations! ${job.company} has officially offered you the ${job.title} position. Please review your offer details below.`;
+                        break;
+
+                    case "Rejected":
+                        message = `Unfortunately, your application for ${job.title} was rejected.`;
+                        break;
+
+                    default:
+                        message = `Application status updated.`;
+                }
+
+                // Notification
+                // Notification (Update if exists, otherwise create)
+                await notificationCollection.updateOne(
+                    {
+                        userId,
+                        jobId,
+                    },
+                    {
                         $set: {
-                            "applicants.$.status": status,
+                            userEmail: applicant.email,
+                            jobTitle: job.title,
+                            company: job.company,
+
+                            status,
+                            title: `Application ${status}`,
+                            message,
+
+                            interview: status === "Interview" ? interview : null,
+                            hiring: status === "Hired" ? hiring : null,
+
+                            isRead: false,
+                            updatedAt: new Date(),
                         },
+
+                        $setOnInsert: {
+                            createdAt: new Date(),
+                        },
+                    },
+                    {
+                        upsert: true,
                     }
                 );
 
                 res.send({
                     success: true,
                     message: "Applicant status updated",
-                    result,
                 });
 
             } catch (error) {
-
                 console.log(error);
 
                 res.status(500).send({
                     success: false,
                     message: "Server Error",
                 });
-
             }
         });
+
 
         app.get("/api/employer/analytics/:email", async (req, res) => {
             try {
@@ -797,6 +873,30 @@ async function run() {
             }
 
         })
+
+        app.get("/api/notifications/:userId", async (req, res) => {
+            try {
+                const { userId } = req.params;
+
+                const notifications = await notificationCollection
+                    .find({ userId })
+                    .sort({ createdAt: -1 })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    result: notifications,
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Failed to load notifications",
+                });
+            }
+        });
 
         //...........bookmark................
 
