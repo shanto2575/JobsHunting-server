@@ -63,25 +63,18 @@ async function run() {
                     limit = 6,
                 } = req.query;
 
-                const query = {
+                let query = {
                     status: "approved",
                 };
 
                 if (search) {
-                    query.$or = [
-                        {
-                            title: {
-                                $regex: search,
-                                $options: "i",
-                            },
-                        },
-                        {
-                            company: {
-                                $regex: search,
-                                $options: "i",
-                            },
-                        },
-                    ];
+                    query.$and = query.$and || [];
+                    query.$and.push({
+                        $or: [
+                            { title: { $regex: search, $options: "i" } },
+                            { company: { $regex: search, $options: "i" } }
+                        ]
+                    });
                 }
 
                 if (category) {
@@ -98,40 +91,22 @@ async function run() {
                         $options: "i",
                     };
                 }
-                if (salary) {
 
+                if (salary) {
                     const [min, max] = salary.split("-");
 
                     if (max) {
-
                         query.$expr = {
                             $and: [
-                                {
-                                    $gte: [
-                                        { $toInt: "$salary" },
-                                        Number(min),
-                                    ],
-                                },
-                                {
-                                    $lte: [
-                                        { $toInt: "$salary" },
-                                        Number(max),
-                                    ],
-                                },
+                                { $gte: [{ $toInt: "$salary" }, Number(min)] },
+                                { $lte: [{ $toInt: "$salary" }, Number(max)] },
                             ],
                         };
-
                     } else {
-
                         query.$expr = {
-                            $gte: [
-                                { $toInt: "$salary" },
-                                Number(min),
-                            ],
+                            $gte: [{ $toInt: "$salary" }, Number(min)],
                         };
-
                     }
-
                 }
 
                 const currentPage = Number(page);
@@ -163,6 +138,11 @@ async function run() {
                 });
             }
         });
+
+        app.get('/api/featured-companies', async (req, res) => {
+            const result = await jobsCollection.find({ status: "approved" }).limit(6).toArray()
+            res.json(result)
+        })
 
         app.get("/api/jobs/:id", async (req, res) => {
             try {
