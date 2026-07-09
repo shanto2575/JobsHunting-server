@@ -472,6 +472,36 @@ async function run() {
 
         //...............Employer API................
 
+        app.get("/api/profile/:email", async (req, res) => {
+            try {
+                const { email } = req.params;
+
+                const jobs = await jobsCollection.find({
+                    userEmail: email,
+                }).toArray();
+
+                const totalPublish = jobs.length;
+
+                const totalApplicants = jobs.reduce((total, job) => {
+                    return total + (job.applicants?.length || 0);
+                }, 0);
+
+                res.send({
+                    success: true,
+                    totalPublish,
+                    totalApplicants,
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        });
+
         app.get('/api/employer/postedjobs/:email', async (req, res) => {
             try {
                 const { email } = req.params;
