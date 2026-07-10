@@ -281,7 +281,7 @@ async function run() {
             }
         })
 
-        app.patch("/api/manage-user/block/:id", async (req, res) => {
+        app.patch("/api/manage-user/block/:id",verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const { status } = req.body;
@@ -360,7 +360,7 @@ async function run() {
             });
         });
 
-        app.delete('/api/user-account/delete/:id', async (req, res) => {
+        app.delete('/api/user-account/delete/:id',verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const result = await userCollection.deleteOne({ _id: new ObjectId(id) })
@@ -400,7 +400,7 @@ async function run() {
             res.json(result)
         })
 
-        app.delete("/api/admin/jobs/:id", async (req, res) => {
+        app.delete("/api/admin/jobs/:id",verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
 
@@ -421,7 +421,7 @@ async function run() {
             }
         });
 
-        app.patch("/api/admin/jobs/status/:id", async (req, res) => {
+        app.patch("/api/admin/jobs/status/:id",verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const { status } = req.body;
@@ -747,7 +747,7 @@ async function run() {
 
         })
 
-        app.patch("/api/employer/applicants/status", async (req, res) => {
+        app.patch("/api/employer/applicants/status",verifyToken, async (req, res) => {
             try {
                 const { jobId, userId, status, interview, hiring, } = req.body;
 
@@ -1141,7 +1141,7 @@ async function run() {
             }
         });
 
-        app.post('/api/bookmark', async (req, res) => {
+        app.post('/api/bookmark',verifyToken, async (req, res) => {
             try {
                 const data = req.body;
 
@@ -1204,7 +1204,7 @@ async function run() {
             }
         });
 
-        app.post('/api/report-jobs', async (req, res) => {
+        app.post('/api/report-jobs',verifyToken, async (req, res) => {
             try {
                 const data = req.body;
                 const isExist = await reportCollection.findOne({ jobId: data.jobId, userId: data.userId })
