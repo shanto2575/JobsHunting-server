@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 const uri = process.env.MONGODB_URI;
 
 cloudinary.config({
@@ -35,6 +36,39 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+
+//...........jwt token...............
+
+const JWKS = createRemoteJWKSet(new URL(`${process.env.CLIENT_URL}/api/auth/jwks`));
+
+const verifyToken = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    // console.log(authHeader,'auhtheader')
+
+    if (!authHeader || !authHeader.startsWith("Bearer")) {
+        return res.status(401).json({ msg: "Unauthorized" });
+    }
+
+    // ["Bearer", "xjasasdhsagdydsav"]
+
+    const token = authHeader.split(" ")[1];
+    // console.log(token,'servertoken')
+
+    if (!token) {
+        return res.status(401).json({ msg: "Unauthorized" });
+    }
+
+    try {
+        const { payload } = await jwtVerify(token, JWKS);
+        req.user = payload;
+        // console.log(payload)
+
+        next();
+    } catch (error) {
+        console.log(error);
+        return res.status(401).json({ msg: "Unauthorized" });
+    }
+};
 
 
 async function run() {
@@ -507,12 +541,14 @@ async function run() {
             try {
                 const { email } = req.params;
 
-                // Total Published Jobs
+                const user = await userCollection.findOne({
+                    email,
+                });
+
                 const totalPublish = await jobsCollection.countDocuments({
                     userEmail: email,
                 });
 
-                // Total Applicants
                 const applicantResult = await jobsCollection.aggregate([
                     {
                         $match: {
@@ -538,13 +574,15 @@ async function run() {
                     },
                 ]).toArray();
 
-                const totalApplicants = applicantResult[0]?.totalApplicants || 0;
+                const totalApplicants =
+                    applicantResult[0]?.totalApplicants || 0;
 
                 res.send({
                     success: true,
                     result: {
                         totalPublish,
                         totalApplicants,
+                        plan: user?.plan || "free",
                     },
                 });
 
@@ -619,7 +657,7 @@ async function run() {
             }
         });
 
-        app.post('/api/employer/postsjob', async (req, res) => {
+        app.post('/api/employer/postsjob', verifyToken, async (req, res) => {
             const data = req.body;
             const user = await userCollection.findOne({
                 email: data.userEmail,
@@ -639,7 +677,7 @@ async function run() {
             res.json(result)
         })
 
-        app.patch('/api/employer/postedjob/:id', async (req, res) => {
+        app.patch('/api/employer/postedjob/:id', verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const data = req.body;
@@ -676,7 +714,7 @@ async function run() {
             }
         })
 
-        app.delete('/api/employer/postedjob/delete/:id', async (req, res) => {
+        app.delete('/api/employer/postedjob/delete/:id', verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 if (!id) {
@@ -1020,6 +1058,8 @@ async function run() {
                     savedJobs,
                     interviews,
                     resume,
+                    plan: user?.plan || "free",
+
                 });
 
             } catch (error) {
