@@ -1400,7 +1400,6 @@ async function run() {
                         $set: {
                             name,
                             image,
-                            email
                         }
                     }
                 )
