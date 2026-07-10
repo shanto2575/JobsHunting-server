@@ -73,7 +73,7 @@ const verifyToken = async (req, res, next) => {
 
 async function run() {
     try {
-        await client.connect();
+        // await client.connect();
 
         const db = client.db('JobsHunting')
         const jobsCollection = db.collection('jobs')
@@ -281,7 +281,7 @@ async function run() {
             }
         })
 
-        app.patch("/api/manage-user/block/:id",verifyToken, async (req, res) => {
+        app.patch("/api/manage-user/block/:id", verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const { status } = req.body;
@@ -360,7 +360,7 @@ async function run() {
             });
         });
 
-        app.delete('/api/user-account/delete/:id',verifyToken, async (req, res) => {
+        app.delete('/api/user-account/delete/:id', verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const result = await userCollection.deleteOne({ _id: new ObjectId(id) })
@@ -400,7 +400,7 @@ async function run() {
             res.json(result)
         })
 
-        app.delete("/api/admin/jobs/:id",verifyToken, async (req, res) => {
+        app.delete("/api/admin/jobs/:id", verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
 
@@ -421,7 +421,7 @@ async function run() {
             }
         });
 
-        app.patch("/api/admin/jobs/status/:id",verifyToken, async (req, res) => {
+        app.patch("/api/admin/jobs/status/:id", verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const { status } = req.body;
@@ -747,7 +747,7 @@ async function run() {
 
         })
 
-        app.patch("/api/employer/applicants/status",verifyToken, async (req, res) => {
+        app.patch("/api/employer/applicants/status", verifyToken, async (req, res) => {
             try {
                 const { jobId, userId, status, interview, hiring, } = req.body;
 
@@ -1141,7 +1141,7 @@ async function run() {
             }
         });
 
-        app.post('/api/bookmark',verifyToken, async (req, res) => {
+        app.post('/api/bookmark', verifyToken, async (req, res) => {
             try {
                 const data = req.body;
 
@@ -1204,7 +1204,7 @@ async function run() {
             }
         });
 
-        app.post('/api/report-jobs',verifyToken, async (req, res) => {
+        app.post('/api/report-jobs', verifyToken, async (req, res) => {
             try {
                 const data = req.body;
                 const isExist = await reportCollection.findOne({ jobId: data.jobId, userId: data.userId })
@@ -1388,8 +1388,40 @@ async function run() {
             res.json({ message: 'payments Successful' })
         })
 
+        //.......Edits Profile...........
 
-        await client.db("admin").command({ ping: 1 });
+        app.patch('/api/Edits-Profile/:id', async (req, res) => {
+            try {
+                const { id } = req.params;
+                const { name, image, email } = req.body
+                const result = await userCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    {
+                        $set: {
+                            name,
+                            image,
+                            email
+                        }
+                    }
+                )
+                res.status(200).json(
+                    {
+                        success: true,
+                        message: "Profile Updated Successfully",
+                        result,
+                    }
+                )
+            } catch (error) {
+                console.log(error)
+                res.status(500).send({
+                    success: false,
+                    message: "Server Error",
+                });
+            }
+        })
+
+
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
@@ -1397,8 +1429,6 @@ async function run() {
     }
 }
 run().catch(console.dir);
-
-
 
 
 app.listen(PORT, () => {
