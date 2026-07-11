@@ -421,7 +421,7 @@ async function run() {
             }
         });
 
-        app.patch("/api/admin/jobs/status/:id", verifyToken, async (req, res) => {
+        app.patch("/api/admin/jobs/status/:id", async (req, res) => {
             try {
                 const { id } = req.params;
                 const { status } = req.body;
@@ -657,7 +657,7 @@ async function run() {
             }
         });
 
-        app.post('/api/employer/postsjob', verifyToken, async (req, res) => {
+        app.post('/api/employer/postsjob',verifyToken , async (req, res) => {
             const data = req.body;
             const user = await userCollection.findOne({
                 email: data.userEmail,
@@ -677,7 +677,7 @@ async function run() {
             res.json(result)
         })
 
-        app.patch('/api/employer/postedjob/:id', verifyToken, async (req, res) => {
+        app.patch('/api/employer/postedjob/:id',verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 const data = req.body;
@@ -714,7 +714,7 @@ async function run() {
             }
         })
 
-        app.delete('/api/employer/postedjob/delete/:id', verifyToken, async (req, res) => {
+        app.delete('/api/employer/postedjob/delete/:id',verifyToken, async (req, res) => {
             try {
                 const { id } = req.params;
                 if (!id) {
@@ -747,7 +747,7 @@ async function run() {
 
         })
 
-        app.patch("/api/employer/applicants/status", verifyToken, async (req, res) => {
+        app.patch("/api/employer/applicants/status", async (req, res) => {
             try {
                 const { jobId, userId, status, interview, hiring, } = req.body;
 
